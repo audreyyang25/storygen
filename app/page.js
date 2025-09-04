@@ -13,10 +13,10 @@ export default function Home() {
   const [textColor, setTextColor] = useState("white");
   const [isDragging, setIsDragging] = useState(null);
   const [positions, setPositions] = useState({
-    image_0: { x: 40, y: 40 },
-    image_1: { x: 60, y: 40 },
-    image_2: { x: 40, y: 60 },
-    image_3: { x: 60, y: 60 },
+    image_0: { x: 35, y: 40 },
+    image_1: { x: 65, y: 40 },
+    image_2: { x: 35, y: 60 },
+    image_3: { x: 65, y: 60 },
     title: { x: 50, y: 15 },
     description: { x: 50, y: 22 },
     swaysell: { x: 50, y: 70 },
@@ -40,6 +40,8 @@ export default function Home() {
   const [resizeStart, setResizeStart] = useState(null);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const [workflowType, setWorkflowType] = useState('single'); // 'single' or 'multiple'
+  const [selectedImages, setSelectedImages] = useState([]); // indices of selected images for multiple workflow
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
   const renderCanvasRef = useRef(null);
@@ -47,6 +49,8 @@ export default function Home() {
   const [formData, setFormData] = useState({
     title: '',
     price: '',
+    minPrice: '',
+    maxPrice: '',
     description: '',
     'non-profit': '',
     design_notes: ''
@@ -65,13 +69,43 @@ export default function Home() {
     setPrediction(null);
     setIsLoading(true);
 
+    // Validation for multiple workflow
+    if (workflowType === 'multiple') {
+      if (selectedImages.length !== 4) {
+        setError('Please select exactly 4 images to display.');
+        setIsLoading(false);
+        return;
+      }
+      if (!formData.minPrice || !formData.maxPrice) {
+        setError('Please enter both minimum and maximum prices.');
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    // Validation for single workflow
+    if (workflowType === 'single') {
+      if (!formData.price) {
+        setError('Please enter a price.');
+        setIsLoading(false);
+        return;
+      }
+    }
+
     let base64Images = [];
     if (imageFiles.length > 0) {
-      // Convert first 4 images to base64
-      const imagesToProcess = imageFiles.slice(0, 4);
-      base64Images = await Promise.all(
-        imagesToProcess.map(file => fileToBase64(file))
-      );
+      // Convert images based on workflow
+      if (workflowType === 'single') {
+        base64Images = await Promise.all(
+          imageFiles.map(file => fileToBase64(file))
+        );
+      } else {
+        // Convert only selected images for multiple workflow
+        const selectedFiles = selectedImages.map(index => imageFiles[index]);
+        base64Images = await Promise.all(
+          selectedFiles.map(file => fileToBase64(file))
+        );
+      }
     }
 
     const payload = {
@@ -128,11 +162,28 @@ export default function Home() {
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
+    const totalFiles = imageFiles.length + files.length;
+    const maxImages = workflowType === 'single' ? 3 : 15;
+    
+    if (totalFiles > maxImages) {
+      alert(`Maximum ${maxImages} images allowed for ${workflowType} workflow. Please remove some images first.`);
+      return;
+    }
+    
     setImageFiles(prevFiles => [...prevFiles, ...files]);
   };
 
   const removeImage = (indexToRemove) => {
     setImageFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
+    
+    // Update selectedImages if in multiple workflow
+    if (workflowType === 'multiple') {
+      setSelectedImages(prevSelected => 
+        prevSelected
+          .filter(index => index !== indexToRemove)
+          .map(index => index > indexToRemove ? index - 1 : index)
+      );
+    }
   };
 
   const handleMouseDown = (elementType, e) => {
@@ -222,10 +273,10 @@ export default function Home() {
 
   const resetPositions = () => {
     setPositions({
-      image_0: { x: 40, y: 40 },
-      image_1: { x: 60, y: 40 },
-      image_2: { x: 40, y: 60 },
-      image_3: { x: 60, y: 60 },
+      image_0: { x: 35, y: 40 },
+      image_1: { x: 65, y: 40 },
+      image_2: { x: 35, y: 60 },
+      image_3: { x: 65, y: 60 },
       title: { x: 50, y: 15 },
       description: { x: 50, y: 22 },
       swaysell: { x: 50, y: 70 },
@@ -330,8 +381,13 @@ export default function Home() {
       const scaleX = canvas.width / 540;
       const scaleY = canvas.height / 960;
       
-      // Load and draw product images (up to 4)
-      const imagesToRender = imageFiles.slice(0, 4);
+      // Load and draw product images based on workflow
+      let imagesToRender = [];
+      if (workflowType === 'single') {
+        imagesToRender = imageFiles;
+      } else if (workflowType === 'multiple') {
+        imagesToRender = selectedImages.map(index => imageFiles[index]).filter(Boolean);
+      }
       
       const imagePromises = imagesToRender.map(async (file, index) => {
         const imageKey = `image_${index}`;
@@ -360,10 +416,14 @@ export default function Home() {
       await Promise.all(imagePromises);
       
       // Draw text elements
+      const priceText = workflowType === 'single' 
+        ? `Price: ${formData.price}` 
+        : `Price: ${formData.minPrice} - ${formData.maxPrice}`;
+        
       const textElements = [
         { key: 'title', text: formData.title, weight: 'bold' },
         { key: 'description', text: formData.description, weight: 'bold' },
-        { key: 'price', text: `Price: ${formData.price}`, weight: '600' },
+        { key: 'price', text: priceText, weight: '600' },
         { key: 'nonprofit', text: `Supporting: ${formData['non-profit']}`, weight: '600' }
       ];
       
@@ -464,6 +524,25 @@ export default function Home() {
     }
   };
 
+  const handleWorkflowChange = (newWorkflowType) => {
+    setWorkflowType(newWorkflowType);
+    // Reset form and images when switching workflows
+    setImageFiles([]);
+    setSelectedImages([]);
+    setPrediction(null);
+    setError(null);
+    setFormData({
+      title: '',
+      price: '',
+      minPrice: '',
+      maxPrice: '',
+      description: '',
+      'non-profit': '',
+      design_notes: ''
+    });
+    resetPositions();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400">
       <div className="container max-w-6xl mx-auto p-6">
@@ -479,6 +558,41 @@ export default function Home() {
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8">
             <div className="flex items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800">Product Details</h2>
+            </div>
+
+            {/* Workflow Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">Post Type</label>
+              <div className="flex space-x-4">
+                <button
+                  type="button"
+                  onClick={() => handleWorkflowChange('single')}
+                  className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                    workflowType === 'single'
+                      ? 'bg-purple-600 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className="text-lg font-bold">Single Product Post</div>
+                    <div className="text-sm opacity-90">One product, up to 3 images</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleWorkflowChange('multiple')}
+                  className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                    workflowType === 'multiple'
+                      ? 'bg-purple-600 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className="text-lg font-bold">Multiple Product Gallery</div>
+                    <div className="text-sm opacity-90">Multiple products showcase</div>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-6">
@@ -509,36 +623,76 @@ export default function Home() {
                 </div>
                 {imageFiles.length > 0 && (
                   <div className="mt-3 space-y-3">
-                    {imageFiles.length > 4 && (
+                    {/* Show different messages based on workflow */}
+                    {workflowType === 'single' && imageFiles.length === 3 && (
                       <p className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg">
-                        ℹ️ Only the first 4 images will be displayed in your story
+                        ℹ️ Maximum 3 images reached
                       </p>
+                    )}
+                    {workflowType === 'multiple' && imageFiles.length > 0 && (
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <p className="text-sm text-blue-700">
+                          📁 {imageFiles.length}/15 images uploaded • Select exactly 4 to display ({selectedImages.length}/4 selected)
+                        </p>
+                        {selectedImages.length === 0 && imageFiles.length > 0 && (
+                          <p className="text-xs text-blue-600 mt-1">Click on images below to select which ones to display</p>
+                        )}
+                      </div>
                     )}
                     
                     <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                      {imageFiles.map((file, index) => (
-                        <div key={index} className="relative group">
-                          <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt={file.name}
-                              className="w-full h-full object-cover"
-                            />
+                      {imageFiles.map((file, index) => {
+                        const isSelected = selectedImages.includes(index);
+                        return (
+                          <div key={index} className="relative group">
+                            <div 
+                              className={`aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer transition-all duration-200 ${
+                                workflowType === 'multiple' 
+                                  ? (isSelected ? 'ring-4 ring-blue-400 ring-opacity-75' : 'hover:ring-2 hover:ring-gray-300') 
+                                  : ''
+                              }`}
+                              onClick={() => {
+                                if (workflowType === 'multiple') {
+                                  if (isSelected) {
+                                    setSelectedImages(prev => prev.filter(i => i !== index));
+                                  } else if (selectedImages.length < 4) {
+                                    setSelectedImages(prev => [...prev, index]);
+                                  }
+                                }
+                              }}
+                            >
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={file.name}
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Selection indicator for multiple workflow */}
+                              {workflowType === 'multiple' && (
+                                <div className="absolute top-1 left-1">
+                                  <div className={`w-6 h-6 rounded-full border-2 border-white flex items-center justify-center ${
+                                    isSelected ? 'bg-blue-500 text-white' : 'bg-gray-300'
+                                  }`}>
+                                    {isSelected ? <span className="text-xs font-bold">{selectedImages.indexOf(index) + 1}</span> : ''}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                            >
+                              ✕
+                            </button>
+                            <p className="text-xs text-gray-600 mt-1 truncate">{file.name}</p>
+                            {/* Show "Will show" for single workflow or selected images in multiple workflow */}
+                            {(workflowType === 'single' || (workflowType === 'multiple' && isSelected)) && (
+                              <span className="absolute top-1 right-1 bg-green-500 text-white text-xs px-1 rounded">
+                                Will show
+                              </span>
+                            )}
                           </div>
-                          <button
-                            onClick={() => removeImage(index)}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-                          >
-                            ✕
-                          </button>
-                          <p className="text-xs text-gray-600 mt-1 truncate">{file.name}</p>
-                          {index < 4 && (
-                            <span className="absolute top-1 left-1 bg-green-500 text-white text-xs px-1 rounded">
-                              Will show
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -558,19 +712,48 @@ export default function Home() {
                 />
               </div>
 
-              {/* Price */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Price</label>
-                <input
-                  type="text"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all duration-200 bg-gray-50 focus:bg-white"
-                  placeholder="$29.99"
-                  required
-                />
-              </div>
+              {/* Price - Different for each workflow */}
+              {workflowType === 'single' ? (
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Price</label>
+                  <input
+                    type="text"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all duration-200 bg-gray-50 focus:bg-white"
+                    placeholder="$29.99"
+                    required
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Price Range <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-500">Both minimum and maximum prices are required</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      name="minPrice"
+                      value={formData.minPrice}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all duration-200 bg-gray-50 focus:bg-white"
+                      placeholder="Min ($10)"
+                      required
+                    />
+                    <input
+                      type="text"
+                      name="maxPrice"
+                      value={formData.maxPrice}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all duration-200 bg-gray-50 focus:bg-white"
+                      placeholder="Max ($100)"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Description */}
               <div className="space-y-2">
@@ -735,43 +918,54 @@ export default function Home() {
                   </div>
 
                   {/* Individual draggable and resizable images */}
-                  {imageFiles.slice(0, 4).map((file, index) => {
-                    const imageKey = `image_${index}`;
-                    const position = positions[imageKey];
-                    const size = sizes[imageKey];
+                  {(() => {
+                    // For single workflow, show all images (up to 3)
+                    // For multiple workflow, show only selected images (up to 4)
+                    let imagesToShow = [];
+                    if (workflowType === 'single') {
+                      imagesToShow = imageFiles;
+                    } else if (workflowType === 'multiple') {
+                      imagesToShow = selectedImages.map(index => imageFiles[index]).filter(Boolean);
+                    }
                     
-                    return (
-                      <div
-                        key={index}
-                        className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === imageKey || isResizing === imageKey ? 'z-50' : ''}`}
-                        style={{
-                          left: `${position.x}%`,
-                          top: `${position.y}%`
-                        }}
-                      >
-                        <div 
-                          className={`relative group ${isDragging === imageKey ? 'ring-2 ring-purple-400 ring-opacity-50' : ''} ${isResizing === imageKey ? 'ring-2 ring-blue-400 ring-opacity-50' : ''} transition-all duration-200`}
-                          onMouseDown={(e) => handleMouseDown(imageKey, e)}
+                    return imagesToShow.map((file, displayIndex) => {
+                      const imageKey = `image_${displayIndex}`;
+                      const position = positions[imageKey];
+                      const size = sizes[imageKey];
+                      
+                      return (
+                        <div
+                          key={displayIndex}
+                          className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === imageKey || isResizing === imageKey ? 'z-50' : ''}`}
+                          style={{
+                            left: `${position.x}%`,
+                            top: `${position.y}%`
+                          }}
                         >
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={`Product Image ${index + 1}`}
-                            className="object-contain cursor-move pointer-events-none"
-                            style={{
-                              width: `${size.width}px`,
-                              height: `${size.height}px`
-                            }}
-                          />
-                          
-                          {/* Resize handle */}
-                          <div
-                            className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                            onMouseDown={(e) => handleResizeDown(imageKey, e)}
-                          />
+                          <div 
+                            className={`relative group ${isDragging === imageKey ? 'ring-2 ring-purple-400 ring-opacity-50' : ''} ${isResizing === imageKey ? 'ring-2 ring-blue-400 ring-opacity-50' : ''} transition-all duration-200`}
+                            onMouseDown={(e) => handleMouseDown(imageKey, e)}
+                          >
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={`Product Image ${displayIndex + 1}`}
+                              className="object-contain cursor-move pointer-events-none"
+                              style={{
+                                width: `${size.width}px`,
+                                height: `${size.height}px`
+                              }}
+                            />
+                            
+                            {/* Resize handle */}
+                            <div
+                              className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                              onMouseDown={(e) => handleResizeDown(imageKey, e)}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
 
                   {/* Text Overlays */}
                   {/* Title */}
@@ -879,7 +1073,10 @@ export default function Home() {
                         }}
                         onMouseDown={(e) => handleMouseDown('price', e)}
                       >
-                        Price: {formData.price}
+                        {workflowType === 'single' 
+                          ? `Price: ${formData.price}` 
+                          : `Price: ${formData.minPrice} - ${formData.maxPrice}`
+                        }
                       </div>
                       <div
                         className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
