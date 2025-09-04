@@ -71,8 +71,8 @@ export default function Home() {
 
     // Validation for multiple workflow
     if (workflowType === 'multiple') {
-      if (selectedImages.length !== 4) {
-        setError('Please select exactly 4 images to display.');
+      if (selectedImages.length < 2 || selectedImages.length > 4) {
+        setError('Please select between 2-4 images to display.');
         setIsLoading(false);
         return;
       }
@@ -113,8 +113,11 @@ export default function Home() {
       images: base64Images,
     };
 
+    // Use different APIs based on workflow type
+    const apiEndpoint = workflowType === 'single' ? '/api/predictions' : '/api/gemini-predictions';
+
     try {
-      const response = await fetch("/api/predictions", {
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -128,29 +131,52 @@ export default function Home() {
       }
       setPrediction(prediction);
 
-      // Poll until done
-      while (
-        prediction.status !== "succeeded" &&
-        prediction.status !== "failed"
-      ) {
-        await sleep(1000);
-        const poll = await fetch("/api/predictions/" + prediction.id);
-        prediction = await poll.json();
-        if (poll.status !== 200) {
-          setError(prediction.detail);
-          setIsLoading(false);
-          return;
-        }
-        setPrediction(prediction);
-        
-        // Analyze background color for text contrast when generation is complete
-        if (prediction.status === "succeeded" && prediction.output && prediction.output.length > 0) {
-          try {
-            const colorAnalysis = await analyzeBackgroundColor(prediction.output[prediction.output.length - 1]);
-            setTextColor(colorAnalysis);
-          } catch (error) {
-            console.log("Could not analyze background color, using default text color");
+      // Handle polling differently based on workflow and response
+      if (workflowType === 'single') {
+        // Single workflow: Always uses Replicate, needs polling
+        while (
+          prediction.status !== "succeeded" &&
+          prediction.status !== "failed"
+        ) {
+          await sleep(1000);
+          const poll = await fetch("/api/predictions/" + prediction.id);
+          prediction = await poll.json();
+          if (poll.status !== 200) {
+            setError(prediction.detail);
+            setIsLoading(false);
+            return;
           }
+          setPrediction(prediction);
+        }
+      } else if (workflowType === 'multiple') {
+        // Multiple workflow: Check if fallback to Replicate was used
+        if (prediction.fallback_used && prediction.original_service === 'replicate') {
+          // Fallback used Replicate, need to poll
+          while (
+            prediction.status !== "succeeded" &&
+            prediction.status !== "failed"
+          ) {
+            await sleep(1000);
+            const poll = await fetch("/api/predictions/" + prediction.id);
+            prediction = await poll.json();
+            if (poll.status !== 200) {
+              setError(prediction.detail);
+              setIsLoading(false);
+              return;
+            }
+            setPrediction(prediction);
+          }
+        }
+        // If Gemini was successful (no fallback), no polling needed - direct response
+      }
+      
+      // Analyze background color for text contrast when generation is complete
+      if (prediction.status === "succeeded" && prediction.output && prediction.output.length > 0) {
+        try {
+          const colorAnalysis = await analyzeBackgroundColor(prediction.output[prediction.output.length - 1]);
+          setTextColor(colorAnalysis);
+        } catch (error) {
+          console.log("Could not analyze background color, using default text color");
         }
       }
     } catch (err) {
@@ -224,9 +250,9 @@ export default function Home() {
       const x = ((e.clientX - rect.left) / rect.width) * 100;
       const y = ((e.clientY - rect.top) / rect.height) * 100;
       
-      // Constrain to bounds
-      const constrainedX = Math.max(5, Math.min(95, x));
-      const constrainedY = Math.max(5, Math.min(95, y));
+      // Constrain to bounds (allow closer to edges for more flexibility)
+      const constrainedX = Math.max(-5, Math.min(105, x));
+      const constrainedY = Math.max(-5, Math.min(105, y));
       
       setPositions(prev => ({
         ...prev,
@@ -508,19 +534,82 @@ export default function Home() {
   };
 
   const handleShare = async () => {
-    if (prediction && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Check out my AI-generated Instagram Story!',
-          text: 'Generated with AI Story Generator',
-          url: window.location.href,
-        });
-      } catch (error) {
-        console.log('Error sharing:', error);
-      }
+    if (!prediction || !prediction.output) {
+      alert('Please generate a story first before sharing');
+      return;
+    }
+
+    try {
+      // Generate the clean image without SwaySell link
+      await renderStoryToCanvas(false, 'instagram'); // false = no SwaySell link
+      
+      const canvas = renderCanvasRef.current;
+      
+      // Convert canvas to blob
+      canvas.toBlob(async (blob) => {
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], 'story.png', { type: 'image/png' })] })) {
+          // Share the actual image file
+          try {
+            const file = new File([blob], 'instagram-story.png', { type: 'image/png' });
+            await navigator.share({
+              title: 'Check out my AI-generated Instagram Story!',
+              text: 'Generated with AI Story Generator',
+              files: [file]
+            });
+          } catch (error) {
+            console.log('Error sharing file:', error);
+            // Fallback to copying image as data URL
+            fallbackToDataUrlShare(canvas);
+          }
+        } else {
+          // Fallback for browsers that don't support file sharing
+          fallbackToDataUrlShare(canvas);
+        }
+      }, 'image/png');
+      
+    } catch (error) {
+      console.error('Error preparing image for sharing:', error);
+      alert('Error preparing image for sharing');
+    }
+  };
+
+  const fallbackToDataUrlShare = (canvas) => {
+    const dataUrl = canvas.toDataURL('image/png');
+    
+    if (navigator.share) {
+      // Share with data URL (some platforms support this)
+      navigator.share({
+        title: 'Check out my AI-generated Instagram Story!',
+        text: 'Generated with AI Story Generator',
+        url: dataUrl
+      }).catch(() => {
+        // Final fallback - copy to clipboard
+        copyImageToClipboard(canvas);
+      });
     } else {
-      navigator.clipboard.writeText(window.location.href);
-      alert('Link copied to clipboard!');
+      // Copy to clipboard for desktop browsers
+      copyImageToClipboard(canvas);
+    }
+  };
+
+  const copyImageToClipboard = async (canvas) => {
+    try {
+      // Try to copy image to clipboard
+      canvas.toBlob(async (blob) => {
+        const item = new ClipboardItem({ 'image/png': blob });
+        await navigator.clipboard.write([item]);
+        alert('✅ Clean story image copied to clipboard! (No SwaySell link included)');
+      }, 'image/png');
+    } catch (error) {
+      console.log('Clipboard not supported, showing download link');
+      // Final fallback - trigger download
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `clean-instagram-story-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      alert('✅ Clean story image downloaded! (No SwaySell link included)');
     }
   };
 
@@ -632,10 +721,16 @@ export default function Home() {
                     {workflowType === 'multiple' && imageFiles.length > 0 && (
                       <div className="bg-blue-50 p-3 rounded-lg">
                         <p className="text-sm text-blue-700">
-                          📁 {imageFiles.length}/15 images uploaded • Select exactly 4 to display ({selectedImages.length}/4 selected)
+                          📁 {imageFiles.length}/15 images uploaded • Select 2-4 to display ({selectedImages.length}/4 selected)
                         </p>
                         {selectedImages.length === 0 && imageFiles.length > 0 && (
-                          <p className="text-xs text-blue-600 mt-1">Click on images below to select which ones to display</p>
+                          <p className="text-xs text-blue-600 mt-1">Click on images below to select which ones to display (min 2, max 4)</p>
+                        )}
+                        {selectedImages.length === 1 && (
+                          <p className="text-xs text-amber-600 mt-1">Select at least 1 more image to continue</p>
+                        )}
+                        {selectedImages.length >= 2 && selectedImages.length <= 4 && (
+                          <p className="text-xs text-green-600 mt-1">✓ Ready to generate ({selectedImages.length} images selected)</p>
                         )}
                       </div>
                     )}
@@ -657,6 +752,9 @@ export default function Home() {
                                     setSelectedImages(prev => prev.filter(i => i !== index));
                                   } else if (selectedImages.length < 4) {
                                     setSelectedImages(prev => [...prev, index]);
+                                  } else {
+                                    // Optional: Show message when trying to select more than 4
+                                    // You can add a toast notification here if desired
                                   }
                                 }
                               }}
