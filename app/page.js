@@ -21,7 +21,12 @@ export default function Home() {
     description: { x: 50, y: 22 },
     swaysell: { x: 50, y: 70 },
     price: { x: 50, y: 80 },
-    nonprofit: { x: 50, y: 90 }
+    nonprofit: { x: 50, y: 90 },
+    similarProducts: { x: 50, y: 85 },
+    similarImage_0: { x: 40, y: 92 },
+    similarImage_1: { x: 60, y: 92 },
+    similarPrice_0: { x: 40, y: 96 },
+    similarPrice_1: { x: 60, y: 96 }
   });
 
   const [sizes, setSizes] = useState({
@@ -33,16 +38,22 @@ export default function Home() {
     description: { fontSize: 25 },
     swaysell: { fontSize: 20 },
     price: { fontSize: 30 },
-    nonprofit: { fontSize: 30 }
+    nonprofit: { fontSize: 30 },
+    similarProducts: { fontSize: 18 },
+    similarImage_0: { width: 60, height: 60 },
+    similarImage_1: { width: 60, height: 60 },
+    similarPrice_0: { fontSize: 12 },
+    similarPrice_1: { fontSize: 12 }
   });
 
-  const [isResizing, setIsResizing] = useState(null);
-  const [resizeStart, setResizeStart] = useState(null);
+  // Removed resize state - using sliders instead
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [workflowType, setWorkflowType] = useState('single'); // 'single' or 'multiple'
   const [selectedImages, setSelectedImages] = useState([]); // indices of selected images for multiple workflow
+  const [similarProducts, setSimilarProducts] = useState([]); // up to 2 similar product images
   const fileInputRef = useRef(null);
+  const similarProductsInputRef = useRef(null);
   const canvasRef = useRef(null);
   const renderCanvasRef = useRef(null);
 
@@ -53,7 +64,9 @@ export default function Home() {
     maxPrice: '',
     description: '',
     'non-profit': '',
-    design_notes: ''
+    design_notes: '',
+    similarProduct1Price: '',
+    similarProduct2Price: ''
   });
 
   const handleInputChange = (e) => {
@@ -212,37 +225,38 @@ export default function Home() {
     }
   };
 
+  const handleSimilarProductsChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    const totalFiles = similarProducts.length + files.length;
+    
+    if (totalFiles > 2) {
+      alert('Maximum 2 similar products allowed. Please remove some first.');
+      return;
+    }
+    
+    setSimilarProducts(prevFiles => [...prevFiles, ...files]);
+  };
+
+  const removeSimilarProduct = (indexToRemove) => {
+    setSimilarProducts(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
+    // Clear the corresponding price when removing
+    if (indexToRemove === 0) {
+      setFormData(prev => ({ ...prev, similarProduct1Price: '' }));
+    } else if (indexToRemove === 1) {
+      setFormData(prev => ({ ...prev, similarProduct2Price: '' }));
+    }
+  };
+
   const handleMouseDown = (elementType, e) => {
     setIsDragging(elementType);
-    setIsResizing(null);
     e.preventDefault();
     e.stopPropagation();
   };
 
-  const handleResizeDown = (elementType, e) => {
-    setIsResizing(elementType);
-    setIsDragging(null);
-    
-    // Store initial size and mouse position for more stable resize
-    const rect = e.currentTarget.closest('[data-story-container]').getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const currentSize = elementType.startsWith('image_') 
-      ? sizes[elementType].width 
-      : sizes[elementType].fontSize;
-      
-    setResizeStart({
-      mouseX,
-      mouseY,
-      initialSize: currentSize
-    });
-    
-    e.preventDefault();
-    e.stopPropagation();
-  };
+  // Removed resize functionality - using sliders instead
 
   const handleMouseMove = (e) => {
-    if (!isDragging && !isResizing) return;
+    if (!isDragging) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
     
@@ -259,42 +273,10 @@ export default function Home() {
         [isDragging]: { x: constrainedX, y: constrainedY }
       }));
     }
-    
-    if (isResizing && resizeStart) {
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      
-      // Calculate distance change from initial position
-      const deltaX = mouseX - resizeStart.mouseX;
-      const deltaY = mouseY - resizeStart.mouseY;
-      const deltaDistance = Math.sqrt(deltaX ** 2 + deltaY ** 2);
-      
-      // Use sign of deltaX to determine if growing or shrinking
-      const direction = deltaX > 0 ? 1 : -1;
-      const sizeChange = direction * deltaDistance * 0.5;
-      
-      if (isResizing.startsWith('image_')) {
-        const newSize = Math.max(50, Math.min(300, resizeStart.initialSize + sizeChange));
-        setSizes(prev => ({
-          ...prev,
-          [isResizing]: { width: newSize, height: newSize }
-        }));
-      } else {
-        // Text element resize
-        const fontSizeChange = sizeChange * 0.3;
-        const newFontSize = Math.max(10, Math.min(120, resizeStart.initialSize + fontSizeChange));
-        setSizes(prev => ({
-          ...prev,
-          [isResizing]: { fontSize: newFontSize }
-        }));
-      }
-    }
   };
 
   const handleMouseUp = () => {
     setIsDragging(null);
-    setIsResizing(null);
-    setResizeStart(null);
   };
 
   const resetPositions = () => {
@@ -307,7 +289,12 @@ export default function Home() {
       description: { x: 50, y: 22 },
       swaysell: { x: 50, y: 70 },
       price: { x: 50, y: 80 },
-      nonprofit: { x: 50, y: 90 }
+      nonprofit: { x: 50, y: 90 },
+      similarProducts: { x: 50, y: 85 },
+      similarImage_0: { x: 40, y: 92 },
+      similarImage_1: { x: 60, y: 92 },
+      similarPrice_0: { x: 40, y: 96 },
+      similarPrice_1: { x: 60, y: 96 }
     });
     setSizes({
       image_0: { width: 130, height: 130 },
@@ -318,7 +305,12 @@ export default function Home() {
       description: { fontSize: 25 },
       swaysell: { fontSize: 20 },
       price: { fontSize: 30 },
-      nonprofit: { fontSize: 30 }
+      nonprofit: { fontSize: 30 },
+      similarProducts: { fontSize: 18 },
+      similarImage_0: { width: 60, height: 60 },
+      similarImage_1: { width: 60, height: 60 },
+      similarPrice_0: { fontSize: 12 },
+      similarPrice_1: { fontSize: 12 }
     });
   };
 
@@ -453,6 +445,11 @@ export default function Home() {
         { key: 'nonprofit', text: `Supporting: ${formData['non-profit']}`, weight: '600' }
       ];
       
+      // Add similar products title if there are similar products
+      if (similarProducts.length > 0) {
+        textElements.push({ key: 'similarProducts', text: 'Similar Products', weight: '600' });
+      }
+      
       if (includeSwaySell) {
         textElements.push({ key: 'swaysell', text: 'Insert SwaySell Link Here', weight: '500' });
       }
@@ -503,6 +500,123 @@ export default function Home() {
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
       });
+
+      // Draw Similar Products section if exists
+      if (similarProducts.length > 0) {
+        const similarProductsY = canvas.height - 120; // Position near bottom
+        const similarProductsWidth = 300 * scaleX;
+        const similarProductsX = (canvas.width - similarProductsWidth) / 2;
+        
+        // No background - similar products blend with story background
+        
+        // Draw "Similar Products" title using draggable text position and size
+        const similarProductsPosition = positions.similarProducts;
+        const similarProductsSize = sizes.similarProducts;
+        const titleX = (similarProductsPosition.x / 100) * canvas.width;
+        const titleY = (similarProductsPosition.y / 100) * canvas.height;
+        
+        const scaledFontSize = similarProductsSize.fontSize * Math.min(scaleX, scaleY);
+        const fontFamily = fontStyle === 'sans-serif' ? 'Arial, sans-serif' :
+                          fontStyle === 'serif' ? 'Georgia, serif' :
+                          fontStyle === 'cursive' ? 'cursive' :
+                          fontStyle === 'monospace' ? 'monospace' :
+                          fontStyle === 'bold' ? 'Arial Black, sans-serif' :
+                          'Arial, sans-serif';
+        
+        ctx.font = `600 ${scaledFontSize}px ${fontFamily}`;
+        ctx.fillStyle = textColor?.textColor || '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Add text shadow
+        const shadowBlur = 4 * Math.min(scaleX, scaleY);
+        const shadowOffset = 2 * Math.min(scaleX, scaleY);
+        ctx.shadowColor = (textColor?.textColor || '#ffffff') === '#000000' ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = shadowBlur;
+        ctx.shadowOffsetX = shadowOffset;
+        ctx.shadowOffsetY = shadowOffset;
+        
+        ctx.fillText('Similar Products', titleX, titleY);
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Draw similar product images and prices
+        const imageSize = 48 * Math.min(scaleX, scaleY);
+        const startX = similarProducts.length === 1 
+          ? canvas.width / 2 - imageSize / 2
+          : similarProductsX + 40 * scaleX;
+        const imageSpacing = similarProducts.length === 1 ? 0 : 120 * scaleX;
+        
+        const similarProductPromises = similarProducts.map(async (file, index) => {
+          const img = new Image();
+          const imageUrl = URL.createObjectURL(file);
+          
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = imageUrl;
+          });
+          
+          // Use draggable positions and sizes for similar product images
+          const imageKey = `similarImage_${index}`;
+          const priceKey = `similarPrice_${index}`;
+          const imagePosition = positions[imageKey];
+          const pricePosition = positions[priceKey];
+          const imageSize = sizes[imageKey];
+          const priceSize = sizes[priceKey];
+          
+          if (imagePosition && imageSize) {
+            const x = (imagePosition.x / 100) * canvas.width - (imageSize.width * scaleX) / 2;
+            const y = (imagePosition.y / 100) * canvas.height - (imageSize.height * scaleY) / 2;
+            
+            ctx.drawImage(img, x, y, imageSize.width * scaleX, imageSize.height * scaleY);
+            
+            // Draw price if exists using draggable position and size
+            const price = formData[`similarProduct${index + 1}Price`];
+            if (price && pricePosition && priceSize) {
+              const priceX = (pricePosition.x / 100) * canvas.width;
+              const priceY = (pricePosition.y / 100) * canvas.height;
+              
+              const scaledPriceFontSize = priceSize.fontSize * Math.min(scaleX, scaleY);
+              const fontFamily = fontStyle === 'sans-serif' ? 'Arial, sans-serif' :
+                                fontStyle === 'serif' ? 'Georgia, serif' :
+                                fontStyle === 'cursive' ? 'cursive' :
+                                fontStyle === 'monospace' ? 'monospace' :
+                                fontStyle === 'bold' ? 'Arial Black, sans-serif' :
+                                'Arial, sans-serif';
+              
+              ctx.font = `400 ${scaledPriceFontSize}px ${fontFamily}`;
+              ctx.fillStyle = textColor?.textColor || '#ffffff';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              
+              // Add text shadow
+              const shadowBlur = 2 * Math.min(scaleX, scaleY);
+              const shadowOffset = 1 * Math.min(scaleX, scaleY);
+              ctx.shadowColor = (textColor?.textColor || '#ffffff') === '#000000' ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)';
+              ctx.shadowBlur = shadowBlur;
+              ctx.shadowOffsetX = shadowOffset;
+              ctx.shadowOffsetY = shadowOffset;
+              
+              ctx.fillText(price, priceX, priceY);
+              
+              // Reset shadow
+              ctx.shadowColor = 'transparent';
+              ctx.shadowBlur = 0;
+              ctx.shadowOffsetX = 0;
+              ctx.shadowOffsetY = 0;
+            }
+          }
+          
+          URL.revokeObjectURL(imageUrl);
+        });
+        
+        await Promise.all(similarProductPromises);
+      }
       
     } catch (error) {
       console.error('Error rendering story:', error);
@@ -618,6 +732,7 @@ export default function Home() {
     // Reset form and images when switching workflows
     setImageFiles([]);
     setSelectedImages([]);
+    setSimilarProducts([]);
     setPrediction(null);
     setError(null);
     setFormData({
@@ -627,7 +742,9 @@ export default function Home() {
       maxPrice: '',
       description: '',
       'non-profit': '',
-      design_notes: ''
+      design_notes: '',
+      similarProduct1Price: '',
+      similarProduct2Price: ''
     });
     resetPositions();
   };
@@ -735,59 +852,68 @@ export default function Home() {
                       </div>
                     )}
                     
-                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                    <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
                       {imageFiles.map((file, index) => {
                         const isSelected = selectedImages.includes(index);
+                        const willShow = workflowType === 'single' || (workflowType === 'multiple' && isSelected);
+                        const imageKey = `image_${index}`;
+                        
                         return (
-                          <div key={index} className="relative group">
-                            <div 
-                              className={`aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer transition-all duration-200 ${
-                                workflowType === 'multiple' 
-                                  ? (isSelected ? 'ring-4 ring-blue-400 ring-opacity-75' : 'hover:ring-2 hover:ring-gray-300') 
-                                  : ''
-                              }`}
-                              onClick={() => {
-                                if (workflowType === 'multiple') {
-                                  if (isSelected) {
-                                    setSelectedImages(prev => prev.filter(i => i !== index));
-                                  } else if (selectedImages.length < 4) {
-                                    setSelectedImages(prev => [...prev, index]);
-                                  } else {
-                                    // Optional: Show message when trying to select more than 4
-                                    // You can add a toast notification here if desired
+                          <div key={index} className="relative group bg-gray-50 p-3 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <div 
+                                className={`w-20 h-20 rounded-lg overflow-hidden bg-gray-100 cursor-pointer transition-all duration-200 flex-shrink-0 ${
+                                  workflowType === 'multiple' 
+                                    ? (isSelected ? 'ring-4 ring-blue-400 ring-opacity-75' : 'hover:ring-2 hover:ring-gray-300') 
+                                    : ''
+                                }`}
+                                onClick={() => {
+                                  if (workflowType === 'multiple') {
+                                    if (isSelected) {
+                                      setSelectedImages(prev => prev.filter(i => i !== index));
+                                    } else if (selectedImages.length < 4) {
+                                      setSelectedImages(prev => [...prev, index]);
+                                    }
                                   }
-                                }
-                              }}
-                            >
-                              <img
-                                src={URL.createObjectURL(file)}
-                                alt={file.name}
-                                className="w-full h-full object-cover"
-                              />
-                              {/* Selection indicator for multiple workflow */}
-                              {workflowType === 'multiple' && (
-                                <div className="absolute top-1 left-1">
-                                  <div className={`w-6 h-6 rounded-full border-2 border-white flex items-center justify-center ${
-                                    isSelected ? 'bg-blue-500 text-white' : 'bg-gray-300'
-                                  }`}>
-                                    {isSelected ? <span className="text-xs font-bold">{selectedImages.indexOf(index) + 1}</span> : ''}
+                                }}
+                              >
+                                <img
+                                  src={URL.createObjectURL(file)}
+                                  alt={file.name}
+                                  className="w-full h-full object-cover"
+                                />
+                                {/* Selection indicator for multiple workflow */}
+                                {workflowType === 'multiple' && (
+                                  <div className="absolute top-1 left-1">
+                                    <div className={`w-5 h-5 rounded-full border-2 border-white flex items-center justify-center ${
+                                      isSelected ? 'bg-blue-500 text-white' : 'bg-gray-300'
+                                    }`}>
+                                      {isSelected ? <span className="text-xs font-bold">{selectedImages.indexOf(index) + 1}</span> : ''}
+                                    </div>
                                   </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-sm font-medium text-gray-700 truncate">{file.name}</p>
+                                  {willShow && (
+                                    <span className="bg-green-500 text-white text-xs px-2 py-1 rounded flex-shrink-0">
+                                      Will show
+                                    </span>
+                                  )}
                                 </div>
-                              )}
+                                
+                                {/* Size controlled from right panel */}
+                              </div>
+                              
+                              <button
+                                onClick={() => removeImage(index)}
+                                className="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors duration-200 flex-shrink-0"
+                              >
+                                ✕
+                              </button>
                             </div>
-                            <button
-                              onClick={() => removeImage(index)}
-                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-                            >
-                              ✕
-                            </button>
-                            <p className="text-xs text-gray-600 mt-1 truncate">{file.name}</p>
-                            {/* Show "Will show" for single workflow or selected images in multiple workflow */}
-                            {(workflowType === 'single' || (workflowType === 'multiple' && isSelected)) && (
-                              <span className="absolute top-1 right-1 bg-green-500 text-white text-xs px-1 rounded">
-                                Will show
-                              </span>
-                            )}
                           </div>
                         );
                       })}
@@ -910,6 +1036,8 @@ export default function Home() {
                 </select>
               </div>
 
+              {/* Size controls moved to right side next to preview */}
+
               {/* Generate Button */}
               <button
                 type="button"
@@ -931,11 +1059,104 @@ export default function Home() {
                   </>
                 )}
               </button>
+
+              {/* Similar Products Section - Optional */}
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Similar Products (Optional)</h3>
+                
+                {/* Similar Products Image Upload */}
+                <div className="space-y-2 mb-4">
+                  <label className="block text-sm font-medium text-gray-700">Similar Product Images</label>
+                  <p className="text-xs text-gray-500">Upload up to 2 similar products to showcase below your main content</p>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleSimilarProductsChange}
+                      ref={similarProductsInputRef}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => similarProductsInputRef.current?.click()}
+                      className="w-full px-4 py-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-all duration-200 flex flex-col items-center justify-center space-y-2"
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="text-gray-600 text-sm">
+                        {similarProducts.length > 0 ? `${similarProducts.length} similar product(s) added` : "Add similar products"}
+                      </span>
+                    </button>
+                  </div>
+                  
+                  {similarProducts.length > 0 && (
+                    <div className="mt-3 space-y-3">
+                      {similarProducts.length === 2 && (
+                        <p className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                          ℹ️ Maximum 2 similar products reached
+                        </p>
+                      )}
+                      
+                      <div className="space-y-3">
+                        {similarProducts.map((file, index) => {
+                          const imageKey = `similarImage_${index}`;
+                          const priceKey = `similarPrice_${index}`;
+                          
+                          return (
+                            <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-start space-x-3 mb-3">
+                                <div className="relative group">
+                                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100">
+                                    <img
+                                      src={URL.createObjectURL(file)}
+                                      alt={file.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                  <button
+                                    onClick={() => removeSimilarProduct(index)}
+                                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-700 mb-1">Similar Product {index + 1}</p>
+                                  <p className="text-xs text-gray-500 truncate mb-2">{file.name}</p>
+                                  
+                                  <div className="w-32">
+                                    <label className="block text-xs text-gray-600 mb-1">Price:</label>
+                                    <input
+                                      type="text"
+                                      name={`similarProduct${index + 1}Price`}
+                                      value={formData[`similarProduct${index + 1}Price`]}
+                                      onChange={handleInputChange}
+                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+                                      placeholder="$19.99"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Size controls moved to right panel */}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Preview Section */}
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8">
+          {/* Preview and Size Controls Section */}
+          <div className="space-y-6">
+            {/* Preview Section */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
                 <h2 className="text-2xl font-bold text-gray-800">Preview</h2>
@@ -1012,7 +1233,7 @@ export default function Home() {
                   
                   {/* Instruction overlay */}
                   <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded z-10">
-                    💡 Drag to move • Blue corner to resize
+                    💡 Drag to move • Use sliders to resize
                   </div>
 
                   {/* Individual draggable and resizable images */}
@@ -1034,14 +1255,14 @@ export default function Home() {
                       return (
                         <div
                           key={displayIndex}
-                          className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === imageKey || isResizing === imageKey ? 'z-50' : ''}`}
+                          className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === imageKey ? 'z-50' : ''}`}
                           style={{
                             left: `${position.x}%`,
                             top: `${position.y}%`
                           }}
                         >
                           <div 
-                            className={`relative group ${isDragging === imageKey ? 'ring-2 ring-purple-400 ring-opacity-50' : ''} ${isResizing === imageKey ? 'ring-2 ring-blue-400 ring-opacity-50' : ''} transition-all duration-200`}
+                            className={`relative group ${isDragging === imageKey ? 'ring-2 ring-purple-400 ring-opacity-50' : ''} transition-all duration-200`}
                             onMouseDown={(e) => handleMouseDown(imageKey, e)}
                           >
                             <img
@@ -1053,12 +1274,6 @@ export default function Home() {
                                 height: `${size.height}px`
                               }}
                             />
-                            
-                            {/* Resize handle */}
-                            <div
-                              className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                              onMouseDown={(e) => handleResizeDown(imageKey, e)}
-                            />
                           </div>
                         </div>
                       );
@@ -1068,13 +1283,13 @@ export default function Home() {
                   {/* Text Overlays */}
                   {/* Title */}
                   <div
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'title' || isResizing === 'title' ? 'z-50' : ''}`}
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'title' ? 'z-50' : ''}`}
                     style={{ 
                       left: `${positions.title.x}%`,
                       top: `${positions.title.y}%`
                     }}
                   >
-                    <div className={`relative group ${isDragging === 'title' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} ${isResizing === 'title' ? 'ring-2 ring-blue-400 ring-opacity-50' : ''} transition-all duration-200`}>
+                    <div className={`relative group ${isDragging === 'title' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} transition-all duration-200`}>
                       <div
                         className="font-bold text-center leading-tight px-4 cursor-move"
                         style={{ 
@@ -1087,24 +1302,18 @@ export default function Home() {
                       >
                         {formData.title}
                       </div>
-                      
-                      {/* Resize handle */}
-                      <div
-                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        onMouseDown={(e) => handleResizeDown('title', e)}
-                      />
                     </div>
                   </div>
 
                   {/* Description */}
                   <div
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'description' || isResizing === 'description' ? 'z-50' : ''}`}
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'description' ? 'z-50' : ''}`}
                     style={{ 
                       left: `${positions.description.x}%`,
                       top: `${positions.description.y}%`
                     }}
                   >
-                    <div className={`relative group ${isDragging === 'description' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} ${isResizing === 'description' ? 'ring-2 ring-blue-400 ring-opacity-50' : ''} transition-all duration-200`}>
+                    <div className={`relative group ${isDragging === 'description' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} transition-all duration-200`}>
                       <div
                         className="font-bold text-center leading-tight px-4 cursor-move"
                         style={{ 
@@ -1117,22 +1326,18 @@ export default function Home() {
                       >
                         {formData.description}
                       </div>
-                      <div
-                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        onMouseDown={(e) => handleResizeDown('description', e)}
-                      />
                     </div>
                   </div>
 
                   {/* SwaySell Link */}
                   <div
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'swaysell' || isResizing === 'swaysell' ? 'z-50' : ''}`}
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'swaysell' ? 'z-50' : ''}`}
                     style={{ 
                       left: `${positions.swaysell.x}%`,
                       top: `${positions.swaysell.y}%`
                     }}
                   >
-                    <div className={`relative group ${isDragging === 'swaysell' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} ${isResizing === 'swaysell' ? 'ring-2 ring-blue-400 ring-opacity-50' : ''} transition-all duration-200`}>
+                    <div className={`relative group ${isDragging === 'swaysell' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} transition-all duration-200`}>
                       <div
                         className="font-medium text-center leading-tight px-4 cursor-move"
                         style={{ 
@@ -1145,22 +1350,18 @@ export default function Home() {
                       >
                         Insert SwaySell Link Here
                       </div>
-                      <div
-                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        onMouseDown={(e) => handleResizeDown('swaysell', e)}
-                      />
                     </div>
                   </div>
 
                   {/* Price */}
                   <div
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'price' || isResizing === 'price' ? 'z-50' : ''}`}
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'price' ? 'z-50' : ''}`}
                     style={{ 
                       left: `${positions.price.x}%`,
                       top: `${positions.price.y}%`
                     }}
                   >
-                    <div className={`relative group ${isDragging === 'price' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} ${isResizing === 'price' ? 'ring-2 ring-blue-400 ring-opacity-50' : ''} transition-all duration-200`}>
+                    <div className={`relative group ${isDragging === 'price' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} transition-all duration-200`}>
                       <div
                         className="font-semibold text-center leading-tight px-4 cursor-move"
                         style={{ 
@@ -1176,22 +1377,18 @@ export default function Home() {
                           : `Price: ${formData.minPrice} - ${formData.maxPrice}`
                         }
                       </div>
-                      <div
-                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        onMouseDown={(e) => handleResizeDown('price', e)}
-                      />
                     </div>
                   </div>
 
                   {/* Non-profit */}
                   <div
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'nonprofit' || isResizing === 'nonprofit' ? 'z-50' : ''}`}
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'nonprofit' ? 'z-50' : ''}`}
                     style={{ 
                       left: `${positions.nonprofit.x}%`,
                       top: `${positions.nonprofit.y}%`
                     }}
                   >
-                    <div className={`relative group ${isDragging === 'nonprofit' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} ${isResizing === 'nonprofit' ? 'ring-2 ring-blue-400 ring-opacity-50' : ''} transition-all duration-200`}>
+                    <div className={`relative group ${isDragging === 'nonprofit' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} transition-all duration-200`}>
                       <div
                         className="font-semibold text-center leading-tight px-4 cursor-move"
                         style={{ 
@@ -1204,12 +1401,99 @@ export default function Home() {
                       >
                         Supporting: {formData['non-profit']}
                       </div>
-                      <div
-                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        onMouseDown={(e) => handleResizeDown('nonprofit', e)}
-                      />
                     </div>
                   </div>
+
+                  {/* Similar Products Title - Draggable */}
+                  {similarProducts.length > 0 && (
+                    <div
+                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === 'similarProducts' ? 'z-50' : ''}`}
+                      style={{ 
+                        left: `${positions.similarProducts.x}%`,
+                        top: `${positions.similarProducts.y}%`
+                      }}
+                    >
+                      <div className={`relative group ${isDragging === 'similarProducts' ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} transition-all duration-200`}>
+                        <div
+                          className="font-semibold text-center leading-tight px-4 cursor-move"
+                          style={{ 
+                            fontFamily: fontStyle, 
+                            fontSize: `${sizes.similarProducts.fontSize}px`,
+                            color: textColor?.textColor || 'white',
+                            textShadow: textColor?.textShadow || '2px 2px 4px rgba(0,0,0,0.8)'
+                          }}
+                          onMouseDown={(e) => handleMouseDown('similarProducts', e)}
+                        >
+                          Similar Products
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Similar Products Images - Draggable and Resizable */}
+                  {similarProducts.map((file, index) => {
+                    const imageKey = `similarImage_${index}`;
+                    const priceKey = `similarPrice_${index}`;
+                    const imagePosition = positions[imageKey];
+                    const pricePosition = positions[priceKey];
+                    const imageSize = sizes[imageKey];
+                    const priceSize = sizes[priceKey];
+                    const price = formData[`similarProduct${index + 1}Price`];
+                    
+                    return (
+                      <div key={`similar-${index}`}>
+                        {/* Similar Product Image */}
+                        <div
+                          className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === imageKey ? 'z-50' : ''}`}
+                          style={{
+                            left: `${imagePosition.x}%`,
+                            top: `${imagePosition.y}%`
+                          }}
+                        >
+                          <div 
+                            className={`relative group ${isDragging === imageKey ? 'ring-2 ring-purple-400 ring-opacity-50' : ''} transition-all duration-200`}
+                            onMouseDown={(e) => handleMouseDown(imageKey, e)}
+                          >
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={`Similar Product ${index + 1}`}
+                              className="object-cover cursor-move pointer-events-none rounded-lg"
+                              style={{
+                                width: `${imageSize.width}px`,
+                                height: `${imageSize.height}px`
+                              }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Similar Product Price */}
+                        {price && (
+                          <div
+                            className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isDragging === priceKey ? 'z-50' : ''}`}
+                            style={{ 
+                              left: `${pricePosition.x}%`,
+                              top: `${pricePosition.y}%`
+                            }}
+                          >
+                            <div className={`relative group ${isDragging === priceKey ? 'ring-2 ring-purple-400 ring-opacity-50 shadow-2xl' : ''} transition-all duration-200`}>
+                              <div
+                                className="font-medium text-center leading-tight px-2 cursor-move"
+                                style={{ 
+                                  fontFamily: fontStyle, 
+                                  fontSize: `${priceSize.fontSize}px`,
+                                  color: textColor?.textColor || 'white',
+                                  textShadow: textColor?.textShadow || '2px 2px 4px rgba(0,0,0,0.8)'
+                                }}
+                                onMouseDown={(e) => handleMouseDown(priceKey, e)}
+                              >
+                                {price}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1224,6 +1508,273 @@ export default function Home() {
                 <p className="text-sm mt-2">Fill out the form and click generate to see the magic!</p>
               </div>
             )}
+            </div>
+
+            {/* Size Controls Panel - Right next to preview */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-6">Size Controls</h3>
+              
+              {/* Only show controls when there's a prediction */}
+              {prediction && prediction.output ? (
+                <div className="space-y-6">
+                  {/* Text Size Controls */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Text Elements</h4>
+                    
+                    {/* Title Size */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs text-gray-600">Title Size:</label>
+                        <span className="text-xs text-gray-500">{sizes.title.fontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="20"
+                        max="100"
+                        value={sizes.title.fontSize}
+                        onChange={(e) => {
+                          const newSize = parseInt(e.target.value);
+                          setSizes(prev => ({
+                            ...prev,
+                            title: { fontSize: newSize }
+                          }));
+                        }}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                    
+                    {/* Description Size */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs text-gray-600">Description Size:</label>
+                        <span className="text-xs text-gray-500">{sizes.description.fontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="50"
+                        value={sizes.description.fontSize}
+                        onChange={(e) => {
+                          const newSize = parseInt(e.target.value);
+                          setSizes(prev => ({
+                            ...prev,
+                            description: { fontSize: newSize }
+                          }));
+                        }}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                    
+                    {/* Price Size */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs text-gray-600">Price Size:</label>
+                        <span className="text-xs text-gray-500">{sizes.price.fontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="15"
+                        max="60"
+                        value={sizes.price.fontSize}
+                        onChange={(e) => {
+                          const newSize = parseInt(e.target.value);
+                          setSizes(prev => ({
+                            ...prev,
+                            price: { fontSize: newSize }
+                          }));
+                        }}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                    
+                    {/* Non-profit Size */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs text-gray-600">Non-profit Size:</label>
+                        <span className="text-xs text-gray-500">{sizes.nonprofit.fontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="15"
+                        max="60"
+                        value={sizes.nonprofit.fontSize}
+                        onChange={(e) => {
+                          const newSize = parseInt(e.target.value);
+                          setSizes(prev => ({
+                            ...prev,
+                            nonprofit: { fontSize: newSize }
+                          }));
+                        }}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                    
+                    {/* SwaySell Size */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs text-gray-600">Link Size:</label>
+                        <span className="text-xs text-gray-500">{sizes.swaysell.fontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="40"
+                        value={sizes.swaysell.fontSize}
+                        onChange={(e) => {
+                          const newSize = parseInt(e.target.value);
+                          setSizes(prev => ({
+                            ...prev,
+                            swaysell: { fontSize: newSize }
+                          }));
+                        }}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                    
+                    {/* Similar Products Title Size */}
+                    {similarProducts.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs text-gray-600">Similar Products Title:</label>
+                          <span className="text-xs text-gray-500">{sizes.similarProducts.fontSize}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="10"
+                          max="30"
+                          value={sizes.similarProducts.fontSize}
+                          onChange={(e) => {
+                            const newSize = parseInt(e.target.value);
+                            setSizes(prev => ({
+                              ...prev,
+                              similarProducts: { fontSize: newSize }
+                            }));
+                          }}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Main Product Images */}
+                  {(() => {
+                    let imagesToShow = [];
+                    if (workflowType === 'single') {
+                      imagesToShow = imageFiles;
+                    } else if (workflowType === 'multiple') {
+                      imagesToShow = selectedImages.map(index => ({ file: imageFiles[index], originalIndex: index })).filter(item => item.file);
+                    }
+                    
+                    if (imagesToShow.length > 0) {
+                      return (
+                        <div className="space-y-4">
+                          <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Product Images</h4>
+                          {imagesToShow.map((item, displayIndex) => {
+                            const file = workflowType === 'single' ? item : item.file;
+                            const imageKey = `image_${displayIndex}`;
+                            
+                            return (
+                              <div key={displayIndex} className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs text-gray-600">Image {displayIndex + 1}:</label>
+                                  <span className="text-xs text-gray-500">{sizes[imageKey]?.width || 130}px</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="50"
+                                  max="300"
+                                  value={sizes[imageKey]?.width || 130}
+                                  onChange={(e) => {
+                                    const newSize = parseInt(e.target.value);
+                                    setSizes(prev => ({
+                                      ...prev,
+                                      [imageKey]: { width: newSize, height: newSize }
+                                    }));
+                                  }}
+                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Similar Products Controls */}
+                  {similarProducts.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Similar Products</h4>
+                      {similarProducts.map((file, index) => {
+                        const imageKey = `similarImage_${index}`;
+                        const priceKey = `similarPrice_${index}`;
+                        
+                        return (
+                          <div key={index} className="space-y-3 p-3 bg-gray-50 rounded-lg">
+                            <h5 className="text-xs font-medium text-gray-700">Similar Product {index + 1}</h5>
+                            
+                            {/* Image Size */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs text-gray-600">Image Size:</label>
+                                <span className="text-xs text-gray-500">{sizes[imageKey]?.width || 60}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="30"
+                                max="120"
+                                value={sizes[imageKey]?.width || 60}
+                                onChange={(e) => {
+                                  const newSize = parseInt(e.target.value);
+                                  setSizes(prev => ({
+                                    ...prev,
+                                    [imageKey]: { width: newSize, height: newSize }
+                                  }));
+                                }}
+                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                              />
+                            </div>
+                            
+                            {/* Price Font Size */}
+                            {formData[`similarProduct${index + 1}Price`] && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs text-gray-600">Price Size:</label>
+                                  <span className="text-xs text-gray-500">{sizes[priceKey]?.fontSize || 12}px</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="8"
+                                  max="24"
+                                  value={sizes[priceKey]?.fontSize || 12}
+                                  onChange={(e) => {
+                                    const newSize = parseInt(e.target.value);
+                                    setSizes(prev => ({
+                                      ...prev,
+                                      [priceKey]: { fontSize: newSize }
+                                    }));
+                                  }}
+                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                  </svg>
+                  <p className="text-sm">Size controls will appear</p>
+                  <p className="text-xs mt-1">after generating your story</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
